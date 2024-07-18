@@ -1,22 +1,23 @@
 package io.kestra.plugin.linear.issues;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.linear.LinearConnection;
-import io.kestra.plugin.linear.model.IssueResponse;
+import io.kestra.plugin.linear.model.*;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-import okhttp3.Response;
 
+import java.io.IOException;
+import java.net.http.HttpResponse;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @SuperBuilder
 @ToString
@@ -33,12 +34,12 @@ import java.util.Map;
                    - id: linear
                      type: io.kestra.plugin.linear.issues.Create
                      token: your_api_token
-                     teamId: the ID of the team where you want to create the issue
+                     team: MyTeamName
                      title: Workflow failed
                      description: "{{ execution.id }} has failed on {{ taskrun.startDate }}. See the link below for more details"
                      labels:
-                       - bug_label_uuid
-                       - workflow_label_uuid
+                       - Bug
+                       - Workflow
                    """
         )
     }
@@ -46,10 +47,10 @@ import java.util.Map;
 public class Create extends LinearConnection implements RunnableTask<Create.Output> {
 
     @Schema(
-        title = "Issue teamId"
+        title = "Team name"
     )
     @PluginProperty(dynamic = true)
-    private String teamId;
+    private String team;
 
     @Schema(
         title = "Issue title"
@@ -64,44 +65,84 @@ public class Create extends LinearConnection implements RunnableTask<Create.Outp
     private String description;
 
     @Schema(
-        title = "Labels ids"
+        title = "Names of labels"
     )
     @PluginProperty(dynamic = true)
     private List<String> labels;
 
     @Override
     public Create.Output run(RunContext runContext) throws Exception {
+        String teamId = getTeamId(runContext);
+        List<String> labelsIds = getLabelsIds(runContext);
+
         String query = buildInputQuery(
-            runContext.render(this.teamId),
+            teamId,
             runContext.render(this.title),
             runContext.render(this.description),
-            runContext.render(this.labels)
+            labelsIds
         );
 
-        try (Response response = makeCall(runContext, query).execute()) {
-            ObjectMapper objectMapper = new ObjectMapper();
+        HttpResponse<String> response = makeCall(runContext, query);
 
-            if (!response.isSuccessful()) {
-                return Output.builder()
-                    .isSuccess(response.isSuccessful())
-                    .build();
-            }
-
-            IssueResponse issue = objectMapper.readValue(response.body().string(), IssueResponse.class);
-
-            if (issue.getErrors() != null || !issue.isSuccess()) {
-                return Output.builder()
-                    .isSuccess(issue.isSuccess())
-                    .build();
-            }
-
-            runContext.logger().info("Issue created with ID: {}", issue.getData().getIssueCreate().getIssue().getId());
-
+        if (response.statusCode() != 200) {
             return Output.builder()
-                .issueId(issue.getIssueId())
+                .isSuccess(false)
+                .build();
+        }
+
+        IssueResponse issue = mapper.readValue(response.body(), IssueResponse.class);
+
+        if (issue.getErrors() != null || !issue.isSuccess()) {
+            return Output.builder()
                 .isSuccess(issue.isSuccess())
                 .build();
         }
+
+        runContext.logger().info("Issue created with ID: {}", issue.getData().getIssueCreate().getIssue().getId());
+
+        return Output.builder()
+            .issueId(issue.getIssueId())
+            .isSuccess(issue.isSuccess())
+            .build();
+    }
+
+    private List<String> getLabelsIds(RunContext runContext) throws Exception {
+        HttpResponse<String> response = makeCall(runContext, Queries.LABELS.getValue());
+
+        if (response.statusCode() != 200) {
+            throw new IOException("Unexpected code " + response.body());
+        }
+
+        LabelsResponse labelsResponse = mapper.readValue(response.body(), LabelsResponse.class);
+
+        List<String> names = runContext.render(this.labels);
+
+        return labelsResponse
+            .getLabels()
+            .stream()
+            .filter(label -> names.contains(label.getName()))
+            .map(LinearData.LinearNode::getId)
+            .toList();
+    }
+
+    private String getTeamId(RunContext runContext) throws Exception {
+        HttpResponse<String> response = makeCall(runContext, Queries.TEAMS.getValue());
+
+        if (response.statusCode() != 200) {
+            throw new IOException("Unexpected code " + response.body());
+        }
+
+        TeamsResponse teamsResponse = mapper.readValue(response.body(), TeamsResponse.class);
+
+        String teamName = runContext.render(this.team);
+
+        return teamsResponse
+            .getTeams()
+            .stream()
+            .filter(team -> teamName.equalsIgnoreCase(team.getName()))
+            .map(LinearData.LinearNode::getId)
+            .findFirst()
+            .orElse(null);
     }
 
     private String buildInputQuery(
@@ -110,13 +151,14 @@ public class Create extends LinearConnection implements RunnableTask<Create.Outp
         String description,
         List<String> labels
     ) throws JsonProcessingException {
-        ObjectMapper objectMapper = new ObjectMapper();
-
         Map<String, Object> input = new HashMap<>();
         input.put("teamId", teamId);
         input.put("title", title);
         input.put("description", description);
-        input.put("labelIds", labels);
+
+        if (!labels.isEmpty()) {
+            input.put("labelIds", labels);
+        }
 
         Map<String, Object> mutation = new HashMap<>();
         mutation.put("input", input);
@@ -125,7 +167,7 @@ public class Create extends LinearConnection implements RunnableTask<Create.Outp
         payload.put("query", "mutation ($input: IssueCreateInput!) { issueCreate(input: $input) { success issue { id } } }");
         payload.put("variables", mutation);
 
-        return objectMapper.writeValueAsString(payload);
+        return mapper.writeValueAsString(payload);
     }
 
     @Getter
