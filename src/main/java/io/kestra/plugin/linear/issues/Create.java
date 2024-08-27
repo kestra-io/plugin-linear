@@ -30,15 +30,22 @@ import java.util.stream.Collectors;
 @Plugin(
     examples = {
         @Example(
+            full = true,
             code = """
-                   token: your_api_token
-                   team: MyTeamName
-                   title: Workflow failed
-                   description: "{{ execution.id }} has failed on {{ taskrun.startDate }}. See the link below for more details"
-                   labels:
-                     - Bug
-                     - Workflow
-                   """
+                id: linear_issues_create
+                namespace: company.team
+
+                tasks:
+                  - id: create_issue
+                    type: io.kestra.plugin.linear.issues.Create
+                    token: your_api_token
+                    team: MyTeamName
+                    title: Workflow failed
+                    description: "{{ execution.id }} has failed on {{ taskrun.startDate }}. See the link below for more details."
+                    labels:
+                      - Bug
+                      - Workflow
+                """
         )
     }
 )
