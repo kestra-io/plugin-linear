@@ -40,11 +40,42 @@ import java.util.stream.Collectors;
                     type: io.kestra.plugin.linear.issues.Create
                     token: your_api_token
                     team: MyTeamName
+                    title: "Increased 5xx in Demo Service"
+                    description: "The number of 5xx has increased beyond the threshold for Demo service."
+                    labels:
+                      - Bug
+                      - Workflow
+                """
+        ),
+        @Example(
+            full = true,
+            title = "Create an issue when a Kestra workflow in any namespace with `company` as prefix fails.",
+            code = """
+                id: create_ticket_on_failure
+                namespace: system
+                
+                tasks:
+                  - id: create_issue
+                    type: io.kestra.plugin.linear.issues.Create
+                    token: your_api_token
+                    team: MyTeamName
                     title: Workflow failed
                     description: "{{ execution.id }} has failed on {{ taskrun.startDate }}. See the link below for more details."
                     labels:
                       - Bug
                       - Workflow
+                
+                triggers:
+                  - id: on_failure
+                    type: io.kestra.plugin.core.trigger.Flow
+                    conditions:
+                      - type: io.kestra.plugin.core.condition.ExecutionStatusCondition
+                        in:
+                          - FAILED
+                          - WARNING
+                      - type: io.kestra.plugin.core.condition.ExecutionNamespaceCondition
+                        namespace: company
+                        comparison: PREFIX
                 """
         )
     }
