@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.linear.LinearConnection;
@@ -53,7 +54,7 @@ import java.util.stream.Collectors;
             code = """
                 id: create_ticket_on_failure
                 namespace: system
-                
+
                 tasks:
                   - id: create_issue
                     type: io.kestra.plugin.linear.issues.Create
@@ -64,7 +65,7 @@ import java.util.stream.Collectors;
                     labels:
                       - Bug
                       - Workflow
-                
+
                 triggers:
                   - id: on_failure
                     type: io.kestra.plugin.core.trigger.Flow
@@ -85,14 +86,12 @@ public class Create extends LinearConnection implements RunnableTask<Create.Outp
     @Schema(
         title = "Team name"
     )
-    @PluginProperty(dynamic = true)
-    private String team;
+    private Property<String> team;
 
     @Schema(
         title = "Issue title"
     )
-    @PluginProperty(dynamic = true)
-    private String title;
+    private Property<String> title;
 
     @Schema(
         title = "Issue description"
@@ -103,8 +102,7 @@ public class Create extends LinearConnection implements RunnableTask<Create.Outp
     @Schema(
         title = "Names of labels"
     )
-    @PluginProperty(dynamic = true)
-    private List<String> labels;
+    private Property<List<String>> labels;
 
     @Override
     public Create.Output run(RunContext runContext) throws Exception {
@@ -113,7 +111,7 @@ public class Create extends LinearConnection implements RunnableTask<Create.Outp
 
         String query = buildInputQuery(
             teamId,
-            runContext.render(this.title),
+            runContext.render(this.title).as(String.class).orElse(null),
             runContext.render(this.description),
             labelsIds
         );
@@ -151,7 +149,7 @@ public class Create extends LinearConnection implements RunnableTask<Create.Outp
 
         LabelsResponse labelsResponse = mapper.readValue(response.body(), LabelsResponse.class);
 
-        List<String> names = runContext.render(this.labels);
+        List<String> names = runContext.render(this.labels).asList(String.class);
 
         return labelsResponse
             .getLabels()
@@ -170,7 +168,7 @@ public class Create extends LinearConnection implements RunnableTask<Create.Outp
 
         TeamsResponse teamsResponse = mapper.readValue(response.body(), TeamsResponse.class);
 
-        String teamName = runContext.render(this.team);
+        String teamName = runContext.render(this.team).as(String.class).orElse(null);
 
         return teamsResponse
             .getTeams()

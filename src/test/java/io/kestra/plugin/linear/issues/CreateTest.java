@@ -2,6 +2,7 @@ package io.kestra.plugin.linear.issues;
 
 import com.google.common.base.Strings;
 import io.kestra.core.junit.annotations.KestraTest;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
 import jakarta.inject.Inject;
@@ -28,11 +29,11 @@ public class CreateTest {
         RunContext runContext = runContextFactory.of();
 
         Create create = Create.builder()
-            .token(getToken())
-            .team(getTeamName())
-            .title("Kestra test")
+            .token(Property.of(getToken()))
+            .team(Property.of(getTeamName()))
+            .title(Property.of("Kestra test"))
             .description("Test issue created by Kestra Unit test")
-            .labels(getLabels())
+            .labels(Property.of(getLabels()))
             .build();
 
         Create.Output output = create.run(runContext);

@@ -3,6 +3,7 @@ package io.kestra.plugin.linear;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.PluginProperty;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.JacksonMapper;
@@ -34,14 +35,13 @@ public abstract class LinearConnection extends Task {
     @Schema(
         title = "Linear API token"
     )
-    @PluginProperty(dynamic = true)
-    private String token;
+    private Property<String> token;
 
     protected HttpResponse<String> makeCall(RunContext runContext, String query) throws IllegalVariableEvaluationException {
         try (HttpClient client = HttpClient.newHttpClient()) {
             HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(LINEAR_API_URL))
-                .header("Authorization", runContext.render(this.token))
+                .header("Authorization", runContext.render(this.token).as(String.class).orElse(null))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(query))
                 .build();
@@ -66,7 +66,7 @@ public abstract class LinearConnection extends Task {
         try (HttpClient client = HttpClient.newHttpClient()) {
             HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(LINEAR_API_URL))
-                .header("Authorization", runContext.render(this.token))
+                .header("Authorization", runContext.render(this.token).as(String.class).orElse(null))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(query))
                 .build();
