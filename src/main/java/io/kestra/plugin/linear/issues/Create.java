@@ -26,7 +26,7 @@ import java.util.stream.Collectors;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Opens issue in Linear"
+    title = "Open an issue in Linear."
 )
 @Plugin(
     examples = {
