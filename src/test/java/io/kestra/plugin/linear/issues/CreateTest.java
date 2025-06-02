@@ -29,11 +29,11 @@ public class CreateTest {
         RunContext runContext = runContextFactory.of();
 
         Create create = Create.builder()
-            .token(Property.of(getToken()))
-            .team(Property.of(getTeamName()))
-            .title(Property.of("Kestra test"))
+            .token(Property.ofValue(getToken()))
+            .team(Property.ofValue(getTeamName()))
+            .title(Property.ofValue("Kestra test"))
             .description("Test issue created by Kestra Unit test")
-            .labels(Property.of(getLabels()))
+            .labels(Property.ofValue(getLabels()))
             .build();
 
         Create.Output output = create.run(runContext);
