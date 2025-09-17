@@ -21,6 +21,8 @@ import static org.hamcrest.Matchers.notNullValue;
     disabledReason = "For CI/CD as requires a secret: LINEAR_TOKEN"
 )
 public class CreateTest {
+    private static final String LINEAR_TOKEN = System.getenv("LINEAR_TOKEN");
+
     @Inject
     private RunContextFactory runContextFactory;
 
@@ -50,7 +52,7 @@ public class CreateTest {
     }
 
     private static String getToken() {
-        return "";
+        return LINEAR_TOKEN;
     }
 
     private static boolean isTokenNull() {
