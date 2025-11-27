@@ -1,0 +1,8 @@
+group: io.kestra.plugin.linear
+name: "linear"
+title: "Linear"
+description: "This sub-group of plugins contains tasks for using a Linear API."
+body: ""
+videos: []
+createdBy: "Kestra Core Team"
+managedBy: "Kestra Core Team"
