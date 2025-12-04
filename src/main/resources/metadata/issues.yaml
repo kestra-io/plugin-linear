@@ -1,8 +1,8 @@
 group: io.kestra.plugin.linear.issues
 name: "issues"
 title: "Issues"
-description: "This sub-group of plugins contains tasks for managing issues using Linear API."
-body: ""
+description: "Tasks that file, update, and retrieve Linear issues."
+body: "Provide a Linear API key with team/workspace context to create issues with required fields, update existing issues, or fetch issue data for synchronization and reporting."
 videos: []
 createdBy: "Kestra Core Team"
 managedBy: "Kestra Core Team"
