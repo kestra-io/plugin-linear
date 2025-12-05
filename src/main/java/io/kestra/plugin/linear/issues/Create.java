@@ -39,7 +39,7 @@ import java.util.stream.Collectors;
                 tasks:
                   - id: create_issue
                     type: io.kestra.plugin.linear.issues.Create
-                    token: your_api_token
+                    token: "{{ secret('LINEAR_API_TOKEN') }}"
                     team: MyTeamName
                     title: "Increased 5xx in Demo Service"
                     description: "The number of 5xx has increased beyond the threshold for Demo service."
@@ -58,7 +58,7 @@ import java.util.stream.Collectors;
                 tasks:
                   - id: create_issue
                     type: io.kestra.plugin.linear.issues.Create
-                    token: your_api_token
+                    token: "{{ secret('LINEAR_API_TOKEN') }}"
                     team: MyTeamName
                     title: Workflow failed
                     description: "{{ execution.id }} has failed on {{ taskrun.startDate }}. See the link below for more details."
