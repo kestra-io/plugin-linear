@@ -33,7 +33,8 @@ public abstract class LinearConnection extends Task {
     protected final static ObjectMapper mapper = JacksonMapper.ofJson();
 
     @Schema(
-        title = "Linear API token"
+        title = "Linear API token",
+        description = "Full Authorization header value for Linear (usually the personal API key). Treat as secret and supply any needed prefix such as `Bearer ` yourself."
     )
     private Property<String> token;
 
