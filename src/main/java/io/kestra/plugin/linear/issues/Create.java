@@ -26,7 +26,8 @@ import java.util.stream.Collectors;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Open an issue in Linear."
+    title = "Create an issue in Linear",
+    description = "Creates a Linear issue via GraphQL. Resolves the team by name (case-insensitive) and optionally attaches labels by their names. Returns Linear's mutation success flag and the created issue id."
 )
 @Plugin(
     examples = {
@@ -84,23 +85,27 @@ import java.util.stream.Collectors;
 public class Create extends LinearConnection implements RunnableTask<Create.Output> {
 
     @Schema(
-        title = "Team name"
+        title = "Team name",
+        description = "Linear team name used to look up the team id; comparison is case-insensitive."
     )
     private Property<String> team;
 
     @Schema(
-        title = "Issue title"
+        title = "Issue title",
+        description = "Title text for the issue; templating supported through property rendering."
     )
     private Property<String> title;
 
     @Schema(
-        title = "Issue description"
+        title = "Issue description",
+        description = "Optional issue body; rendered with flow variables before sending to Linear."
     )
     @PluginProperty(dynamic = true)
     private String description;
 
     @Schema(
-        title = "Names of labels"
+        title = "Label names",
+        description = "Labels to attach, matched by name. If empty, the issue is created without labels."
     )
     private Property<List<String>> labels;
 
@@ -209,12 +214,14 @@ public class Create extends LinearConnection implements RunnableTask<Create.Outp
     public static class Output implements io.kestra.core.models.tasks.Output {
 
         @Schema(
-            title = "Shows whether request was successful"
+            title = "Shows whether request was successful",
+            description = "True when the API call returns HTTP 200 and Linear reports success for the mutation."
         )
         private Boolean isSuccess;
 
         @Schema(
-            title = "Issue id"
+            title = "Issue id",
+            description = "Identifier of the created issue when the mutation succeeds."
         )
         private String issueId;
     }
