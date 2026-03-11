@@ -1,6 +1,7 @@
 package io.kestra.plugin.linear.model;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+
 import lombok.Data;
 
 @Data

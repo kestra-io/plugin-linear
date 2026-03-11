@@ -8,17 +8,17 @@ import lombok.RequiredArgsConstructor;
 public enum Queries {
     TEAMS(
         """
-        {
-          "query": "query { teams { nodes { id name } } }"
-        }
-        """
+            {
+              "query": "query { teams { nodes { id name } } }"
+            }
+            """
     ),
     LABELS(
         """
-        {
-          "query": "query { issueLabels { nodes { id name } } }"
-        }
-        """
+            {
+              "query": "query { issueLabels { nodes { id name } } }"
+            }
+            """
     );
 
     private final String value;

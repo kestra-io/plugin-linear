@@ -1,6 +1,13 @@
 package io.kestra.plugin.linear.issues;
 
+import java.io.IOException;
+import java.net.http.HttpResponse;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
+
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
@@ -9,16 +16,10 @@ import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.linear.LinearConnection;
 import io.kestra.plugin.linear.model.*;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-
-import java.io.IOException;
-import java.net.http.HttpResponse;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 @SuperBuilder
 @ToString
@@ -188,8 +189,7 @@ public class Create extends LinearConnection implements RunnableTask<Create.Outp
         String teamId,
         String title,
         String description,
-        List<String> labels
-    ) throws JsonProcessingException {
+        List<String> labels) throws JsonProcessingException {
         Map<String, Object> input = new HashMap<>();
         input.put("teamId", teamId);
         input.put("title", title);

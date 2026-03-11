@@ -1,25 +1,26 @@
 package io.kestra.plugin.linear;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import io.kestra.core.exceptions.IllegalVariableEvaluationException;
-import io.kestra.core.models.annotations.PluginProperty;
-import io.kestra.core.models.property.Property;
-import io.kestra.core.models.tasks.Task;
-import io.kestra.core.runners.RunContext;
-import io.kestra.core.serializers.JacksonMapper;
-import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.ToString;
-import lombok.experimental.SuperBuilder;
-
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.concurrent.CompletableFuture;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import io.kestra.core.exceptions.IllegalVariableEvaluationException;
+import io.kestra.core.models.property.Property;
+import io.kestra.core.models.tasks.Task;
+import io.kestra.core.runners.RunContext;
+import io.kestra.core.serializers.JacksonMapper;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.ToString;
+import lombok.experimental.SuperBuilder;
 
 @SuperBuilder
 @ToString
@@ -49,15 +50,15 @@ public abstract class LinearConnection extends Task {
 
             return client.send(request, HttpResponse.BodyHandlers.ofString());
 
-//            RequestBody body = RequestBody.create(query, MEDIA_TYPE);
-//            Request request = new Request.Builder()
-//                .url(LINEAR_API_URL)
-//                .post(body)
-//                .addHeader("Authorization", runContext.render(this.token))
-//                .addHeader("Content-Type", "application/json")
-//                .build();
-//
-//            return client.newCall(request);
+            //            RequestBody body = RequestBody.create(query, MEDIA_TYPE);
+            //            Request request = new Request.Builder()
+            //                .url(LINEAR_API_URL)
+            //                .post(body)
+            //                .addHeader("Authorization", runContext.render(this.token))
+            //                .addHeader("Content-Type", "application/json")
+            //                .build();
+            //
+            //            return client.newCall(request);
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -74,15 +75,15 @@ public abstract class LinearConnection extends Task {
 
             return client.sendAsync(request, HttpResponse.BodyHandlers.ofString());
 
-//            RequestBody body = RequestBody.create(query, MEDIA_TYPE);
-//            Request request = new Request.Builder()
-//                .url(LINEAR_API_URL)
-//                .post(body)
-//                .addHeader("Authorization", runContext.render(this.token))
-//                .addHeader("Content-Type", "application/json")
-//                .build();
-//
-//            return client.newCall(request);
+            //            RequestBody body = RequestBody.create(query, MEDIA_TYPE);
+            //            Request request = new Request.Builder()
+            //                .url(LINEAR_API_URL)
+            //                .post(body)
+            //                .addHeader("Authorization", runContext.render(this.token))
+            //                .addHeader("Content-Type", "application/json")
+            //                .build();
+            //
+            //            return client.newCall(request);
         }
     }
 
