@@ -89,25 +89,28 @@ public class Create extends LinearConnection implements RunnableTask<Create.Outp
         title = "Team name",
         description = "Linear team name used to look up the team id; comparison is case-insensitive."
     )
+    @PluginProperty(group = "advanced")
     private Property<String> team;
 
     @Schema(
         title = "Issue title",
         description = "Title text for the issue; templating supported through property rendering."
     )
+    @PluginProperty(group = "advanced")
     private Property<String> title;
 
     @Schema(
         title = "Issue description",
         description = "Optional issue body; rendered with flow variables before sending to Linear."
     )
-    @PluginProperty(dynamic = true)
+    @PluginProperty(dynamic = true, group = "advanced")
     private String description;
 
     @Schema(
         title = "Label names",
         description = "Labels to attach, matched by name. If empty, the issue is created without labels."
     )
+    @PluginProperty(group = "advanced")
     private Property<List<String>> labels;
 
     @Override

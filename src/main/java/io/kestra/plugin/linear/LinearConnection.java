@@ -21,6 +21,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
+import io.kestra.core.models.annotations.PluginProperty;
 
 @SuperBuilder
 @ToString
@@ -37,6 +38,7 @@ public abstract class LinearConnection extends Task {
         title = "Linear API token",
         description = "Full Authorization header value for Linear (usually the personal API key). Treat as secret and supply any needed prefix such as `Bearer ` yourself."
     )
+    @PluginProperty(group = "connection")
     private Property<String> token;
 
     protected HttpResponse<String> makeCall(RunContext runContext, String query) throws IllegalVariableEvaluationException {
