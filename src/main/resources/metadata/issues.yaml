@@ -1,6 +1,6 @@
 group: io.kestra.plugin.linear.issues
 name: "issues"
-title: "Issues"
+title: "Linear Issues"
 description: "Tasks that file, update, and retrieve Linear issues."
 body: "Provide a Linear API key with team/workspace context to create issues with required fields, update existing issues, or fetch issue data for synchronization and reporting."
 videos: []
