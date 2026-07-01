@@ -39,6 +39,7 @@ public abstract class LinearConnection extends Task {
         description = "Full Authorization header value for Linear (usually the personal API key). Treat as secret and supply any needed prefix such as `Bearer ` yourself."
     )
     @PluginProperty(group = "connection", secret = true)
+    @ToString.Exclude
     private Property<String> token;
 
     protected HttpResponse<String> makeCall(RunContext runContext, String query) throws IllegalVariableEvaluationException {
