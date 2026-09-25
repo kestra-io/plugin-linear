@@ -22,6 +22,14 @@ public class IssueResponse {
         return data.issueCreate.issue.getId();
     }
 
+    public String getIssueIdentifier() {
+        return data.issueCreate.issue.getIdentifier();
+    }
+
+    public String getIssueUrl() {
+        return data.issueCreate.issue.getUrl();
+    }
+
     @Data
     public static class IssueData {
 
@@ -32,9 +40,21 @@ public class IssueResponse {
 
             private boolean success;
 
-            private LinearData.LinearNode issue;
+            private CreatedIssue issue;
 
         }
+
+    }
+
+    @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class CreatedIssue {
+
+        private String id;
+
+        private String identifier;
+
+        private String url;
 
     }
 
