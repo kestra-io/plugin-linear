@@ -17,6 +17,7 @@ import jakarta.inject.Inject;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.hamcrest.Matchers.startsWith;
 
 @KestraTest
 @DisabledIf(
@@ -44,6 +45,9 @@ public class CreateTest {
         Create.Output output = create.run(runContext);
 
         assertThat(output.getIssueId(), is(notNullValue()));
+        assertThat(output.getIssueIdentifier(), is(notNullValue()));
+        assertThat(output.getIssueUrl(), is(notNullValue()));
+        assertThat(output.getIssueUrl(), startsWith("https://linear.app/"));
     }
 
     private static List<String> getLabels() {

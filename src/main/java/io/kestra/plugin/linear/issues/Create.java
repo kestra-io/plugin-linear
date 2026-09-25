@@ -28,7 +28,7 @@ import lombok.experimental.SuperBuilder;
 @NoArgsConstructor
 @Schema(
     title = "Create an issue in Linear",
-    description = "Creates a Linear issue via GraphQL. Resolves the team by name (case-insensitive) and optionally attaches labels by their names. Returns Linear's mutation success flag and the created issue id."
+    description = "Creates a Linear issue via GraphQL. Resolves the team by name (case-insensitive) and optionally attaches labels by their names. Returns Linear's mutation success flag along with the created issue's id, human-readable identifier (e.g. `ENG-123`) and URL."
 )
 @Plugin(
     examples = {
@@ -80,6 +80,29 @@ import lombok.experimental.SuperBuilder;
                         namespace: company
                         comparison: PREFIX
                 """
+        ),
+        @Example(
+            full = true,
+            title = "Create an issue and log its identifier and URL.",
+            code = """
+                id: linear_issues_create_and_log
+                namespace: company.team
+
+                tasks:
+                  - id: create_issue
+                    type: io.kestra.plugin.linear.issues.Create
+                    token: "{{ secret('LINEAR_API_TOKEN') }}"
+                    team: MyTeamName
+                    title: "Increased 5xx in Demo Service"
+                    description: "The number of 5xx has increased beyond the threshold for Demo service."
+                    labels:
+                      - Bug
+                      - Workflow
+
+                  - id: log_issue
+                    type: io.kestra.plugin.core.log.Log
+                    message: "Created issue {{ outputs.create_issue.issueIdentifier }} at {{ outputs.create_issue.issueUrl }}"
+                """
         )
     }
 )
@@ -89,21 +112,21 @@ public class Create extends LinearConnection implements RunnableTask<Create.Outp
         title = "Team name",
         description = "Linear team name used to look up the team id; comparison is case-insensitive."
     )
-    @PluginProperty(group = "advanced")
+    @PluginProperty(group = "destination")
     private Property<String> team;
 
     @Schema(
         title = "Issue title",
         description = "Title text for the issue; templating supported through property rendering."
     )
-    @PluginProperty(group = "advanced")
+    @PluginProperty(group = "main")
     private Property<String> title;
 
     @Schema(
         title = "Issue description",
         description = "Optional issue body; rendered with flow variables before sending to Linear."
     )
-    @PluginProperty(dynamic = true, group = "advanced")
+    @PluginProperty(dynamic = true, group = "main")
     private String description;
 
     @Schema(
@@ -141,10 +164,12 @@ public class Create extends LinearConnection implements RunnableTask<Create.Outp
                 .build();
         }
 
-        runContext.logger().info("Issue created with ID: {}", issue.getData().getIssueCreate().getIssue().getId());
+        runContext.logger().info("Issue {} created: {}", issue.getIssueIdentifier(), issue.getIssueUrl());
 
         return Output.builder()
             .issueId(issue.getIssueId())
+            .issueIdentifier(issue.getIssueIdentifier())
+            .issueUrl(issue.getIssueUrl())
             .isSuccess(issue.isSuccess())
             .build();
     }
@@ -206,7 +231,7 @@ public class Create extends LinearConnection implements RunnableTask<Create.Outp
         mutation.put("input", input);
 
         Map<String, Object> payload = new HashMap<>();
-        payload.put("query", "mutation ($input: IssueCreateInput!) { issueCreate(input: $input) { success issue { id } } }");
+        payload.put("query", "mutation ($input: IssueCreateInput!) { issueCreate(input: $input) { success issue { id identifier url } } }");
         payload.put("variables", mutation);
 
         return mapper.writeValueAsString(payload);
@@ -224,9 +249,21 @@ public class Create extends LinearConnection implements RunnableTask<Create.Outp
 
         @Schema(
             title = "Issue id",
-            description = "Identifier of the created issue when the mutation succeeds."
+            description = "UUID of the created issue when the mutation succeeds."
         )
         private String issueId;
+
+        @Schema(
+            title = "Issue identifier",
+            description = "Human-readable identifier of the created issue when the mutation succeeds, e.g. `ENG-123`."
+        )
+        private String issueIdentifier;
+
+        @Schema(
+            title = "Issue URL",
+            description = "Web URL of the created issue when the mutation succeeds."
+        )
+        private String issueUrl;
     }
 
 }
