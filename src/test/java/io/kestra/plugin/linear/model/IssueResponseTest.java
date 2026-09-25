@@ -2,7 +2,7 @@ package io.kestra.plugin.linear.model;
 
 import org.junit.jupiter.api.Test;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import io.kestra.core.serializers.JacksonMapper;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
@@ -26,7 +26,7 @@ class IssueResponseTest {
 
     @Test
     void deserialize() throws Exception {
-        IssueResponse issueResponse = new ObjectMapper().readValue(PAYLOAD, IssueResponse.class);
+        IssueResponse issueResponse = JacksonMapper.ofJson().readValue(PAYLOAD, IssueResponse.class);
 
         assertThat(issueResponse.isSuccess(), is(true));
         assertThat(issueResponse.getIssueId(), is("b5c8f1c0-1234-4a5b-9abc-1234567890ab"));
