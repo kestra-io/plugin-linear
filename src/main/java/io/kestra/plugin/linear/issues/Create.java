@@ -13,6 +13,7 @@ import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
+import io.kestra.core.models.tasks.TicketingTaskInterface;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.linear.LinearConnection;
 import io.kestra.plugin.linear.model.*;
@@ -106,7 +107,7 @@ import lombok.experimental.SuperBuilder;
         )
     }
 )
-public class Create extends LinearConnection implements RunnableTask<Create.Output> {
+public class Create extends LinearConnection implements RunnableTask<Create.Output>, TicketingTaskInterface {
 
     @Schema(
         title = "Team name",
