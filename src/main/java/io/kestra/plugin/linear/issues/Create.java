@@ -11,6 +11,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
+import io.kestra.core.models.annotations.TicketingField;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.TicketingTaskInterface;
@@ -121,6 +122,7 @@ public class Create extends LinearConnection implements RunnableTask<Create.Outp
         description = "Title text for the issue; templating supported through property rendering."
     )
     @PluginProperty(group = "main")
+    @TicketingField(role = TicketingField.Role.CASE_TITLE)
     private Property<String> title;
 
     @Schema(
@@ -128,6 +130,7 @@ public class Create extends LinearConnection implements RunnableTask<Create.Outp
         description = "Optional issue body; rendered with flow variables before sending to Linear."
     )
     @PluginProperty(dynamic = true, group = "main")
+    @TicketingField(role = TicketingField.Role.CASE_DESCRIPTION)
     private String description;
 
     @Schema(
@@ -258,12 +261,14 @@ public class Create extends LinearConnection implements RunnableTask<Create.Outp
             title = "Issue identifier",
             description = "Human-readable identifier of the created issue when the mutation succeeds, e.g. `ENG-123`."
         )
+        @TicketingField(role = TicketingField.Role.TICKET_KEY)
         private String issueIdentifier;
 
         @Schema(
             title = "Issue URL",
             description = "Web URL of the created issue when the mutation succeeds."
         )
+        @TicketingField(role = TicketingField.Role.TICKET_URL)
         private String issueUrl;
     }
 
