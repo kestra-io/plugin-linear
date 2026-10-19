@@ -11,8 +11,10 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
+import io.kestra.core.models.annotations.TicketingField;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
+import io.kestra.core.models.tasks.TicketingTaskInterface;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.linear.LinearConnection;
 import io.kestra.plugin.linear.model.*;
@@ -106,7 +108,7 @@ import lombok.experimental.SuperBuilder;
         )
     }
 )
-public class Create extends LinearConnection implements RunnableTask<Create.Output> {
+public class Create extends LinearConnection implements RunnableTask<Create.Output>, TicketingTaskInterface {
 
     @Schema(
         title = "Team name",
@@ -120,6 +122,7 @@ public class Create extends LinearConnection implements RunnableTask<Create.Outp
         description = "Title text for the issue; templating supported through property rendering."
     )
     @PluginProperty(group = "main")
+    @TicketingField(role = TicketingField.Role.CASE_TITLE)
     private Property<String> title;
 
     @Schema(
@@ -127,6 +130,7 @@ public class Create extends LinearConnection implements RunnableTask<Create.Outp
         description = "Optional issue body; rendered with flow variables before sending to Linear."
     )
     @PluginProperty(dynamic = true, group = "main")
+    @TicketingField(role = TicketingField.Role.CASE_DESCRIPTION)
     private String description;
 
     @Schema(
@@ -135,6 +139,19 @@ public class Create extends LinearConnection implements RunnableTask<Create.Outp
     )
     @PluginProperty(group = "advanced")
     private Property<List<String>> labels;
+
+    @Schema(
+        title = "Priority",
+        description = "Linear priority: `0` (none), `1` (urgent), `2` (high), `3` (medium) or `4` (low). Leave empty to use the Linear default."
+    )
+    @PluginProperty(group = "advanced")
+    @TicketingField(role = TicketingField.Role.CASE_SEVERITY, valueMap = {
+        @TicketingField.Mapping(from = "CRITICAL", to = "1"),
+        @TicketingField.Mapping(from = "HIGH", to = "2"),
+        @TicketingField.Mapping(from = "MEDIUM", to = "3"),
+        @TicketingField.Mapping(from = "LOW", to = "4")
+    })
+    private Property<Integer> priority;
 
     @Override
     public Create.Output run(RunContext runContext) throws Exception {
@@ -145,7 +162,8 @@ public class Create extends LinearConnection implements RunnableTask<Create.Outp
             teamId,
             runContext.render(this.title).as(String.class).orElse(null),
             runContext.render(this.description),
-            labelsIds
+            labelsIds,
+            runContext.render(this.priority).as(Integer.class).orElse(null)
         );
 
         HttpResponse<String> response = makeCall(runContext, query);
@@ -213,11 +231,12 @@ public class Create extends LinearConnection implements RunnableTask<Create.Outp
             .orElse(null);
     }
 
-    private String buildInputQuery(
+    String buildInputQuery(
         String teamId,
         String title,
         String description,
-        List<String> labels) throws JsonProcessingException {
+        List<String> labels,
+        Integer priority) throws JsonProcessingException {
         Map<String, Object> input = new HashMap<>();
         input.put("teamId", teamId);
         input.put("title", title);
@@ -225,6 +244,10 @@ public class Create extends LinearConnection implements RunnableTask<Create.Outp
 
         if (!labels.isEmpty()) {
             input.put("labelIds", labels);
+        }
+
+        if (priority != null) {
+            input.put("priority", priority);
         }
 
         Map<String, Object> mutation = new HashMap<>();
@@ -257,12 +280,14 @@ public class Create extends LinearConnection implements RunnableTask<Create.Outp
             title = "Issue identifier",
             description = "Human-readable identifier of the created issue when the mutation succeeds, e.g. `ENG-123`."
         )
+        @TicketingField(role = TicketingField.Role.TICKET_KEY)
         private String issueIdentifier;
 
         @Schema(
             title = "Issue URL",
             description = "Web URL of the created issue when the mutation succeeds."
         )
+        @TicketingField(role = TicketingField.Role.TICKET_URL)
         private String issueUrl;
     }
 
