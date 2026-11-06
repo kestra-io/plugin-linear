@@ -2,9 +2,7 @@ package io.kestra.plugin.linear.issues;
 
 import java.io.IOException;
 import java.net.http.HttpResponse;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 
@@ -145,12 +143,14 @@ public class Create extends LinearConnection implements RunnableTask<Create.Outp
         description = "Linear priority: `0` (none), `1` (urgent), `2` (high), `3` (medium) or `4` (low). Leave empty to use the Linear default."
     )
     @PluginProperty(group = "advanced")
-    @TicketingField(role = TicketingField.Role.CASE_SEVERITY, valueMap = {
-        @TicketingField.Mapping(from = "CRITICAL", to = "1"),
-        @TicketingField.Mapping(from = "HIGH", to = "2"),
-        @TicketingField.Mapping(from = "MEDIUM", to = "3"),
-        @TicketingField.Mapping(from = "LOW", to = "4")
-    })
+    @TicketingField(
+        role = TicketingField.Role.CASE_SEVERITY, valueMap = {
+            @TicketingField.Mapping(from = "CRITICAL", to = "1"),
+            @TicketingField.Mapping(from = "HIGH", to = "2"),
+            @TicketingField.Mapping(from = "MEDIUM", to = "3"),
+            @TicketingField.Mapping(from = "LOW", to = "4")
+        }
+    )
     private Property<Integer> priority;
 
     @Override
@@ -192,43 +192,112 @@ public class Create extends LinearConnection implements RunnableTask<Create.Outp
             .build();
     }
 
-    private List<String> getLabelsIds(RunContext runContext) throws Exception {
-        HttpResponse<String> response = makeCall(runContext, Queries.LABELS.getValue());
-
-        if (response.statusCode() != 200) {
-            throw new IOException("Unexpected code " + response.body());
+    List<String> getLabelsIds(RunContext runContext) throws Exception {
+        if (this.labels == null) {
+            return Collections.emptyList();
         }
 
-        LabelsResponse labelsResponse = mapper.readValue(response.body(), LabelsResponse.class);
-
         List<String> names = runContext.render(this.labels).asList(String.class);
+        if (names == null || names.isEmpty()) {
+            return Collections.emptyList();
+        }
+        names = names.stream().filter(Objects::nonNull).toList();
+        if (names.isEmpty()) {
+            return Collections.emptyList();
+        }
 
-        return labelsResponse
-            .getLabels()
-            .stream()
-            .filter(label -> names.contains(label.getName()))
-            .map(LinearData.LinearNode::getId)
+        Set<String> requestedNames = new HashSet<>(names);
+        Map<String, String> foundLabels = new HashMap<>();
+
+        String after = null;
+        while (true) {
+            String query = buildFetchQuery(Queries.LABELS.getValue(), after);
+            HttpResponse<String> response = makeCall(runContext, query);
+
+            if (response.statusCode() != 200) {
+                throw new IOException("Unexpected code " + response.body());
+            }
+
+            LabelsResponse labelsResponse = mapper.readValue(response.body(), LabelsResponse.class);
+
+            for (LinearData.LinearNode labelNode : labelsResponse.getLabels()) {
+                if (labelNode != null && labelNode.getName() != null && requestedNames.contains(labelNode.getName())) {
+                    foundLabels.putIfAbsent(labelNode.getName(), labelNode.getId());
+                }
+            }
+
+            if (foundLabels.keySet().containsAll(requestedNames)) {
+                break;
+            }
+
+            LinearData.PageInfo pageInfo = labelsResponse.getPageInfo();
+            if (pageInfo == null || !Boolean.TRUE.equals(pageInfo.getHasNextPage()) || pageInfo.getEndCursor() == null || pageInfo.getEndCursor().isBlank()) {
+                break;
+            }
+            after = pageInfo.getEndCursor();
+        }
+
+        List<String> missingLabels = names.stream()
+            .filter(name -> !foundLabels.containsKey(name))
+            .distinct()
+            .toList();
+
+        if (!missingLabels.isEmpty()) {
+            runContext.logger().warn("The following labels were requested but do not exist in the Linear workspace: {}", missingLabels);
+        }
+
+        return names.stream()
+            .filter(foundLabels::containsKey)
+            .map(foundLabels::get)
+            .distinct()
             .toList();
     }
 
-    private String getTeamId(RunContext runContext) throws Exception {
-        HttpResponse<String> response = makeCall(runContext, Queries.TEAMS.getValue());
+    String getTeamId(RunContext runContext) throws Exception {
+        String teamName = this.team == null ? null : runContext.render(this.team).as(String.class).orElse(null);
 
-        if (response.statusCode() != 200) {
-            throw new IOException("Unexpected code " + response.body());
+        if (teamName == null || teamName.isBlank()) {
+            throw new IllegalArgumentException("Team '" + teamName + "' could not be found in the Linear workspace.");
         }
 
-        TeamsResponse teamsResponse = mapper.readValue(response.body(), TeamsResponse.class);
+        String after = null;
+        while (true) {
+            String query = buildFetchQuery(Queries.TEAMS.getValue(), after);
+            HttpResponse<String> response = makeCall(runContext, query);
 
-        String teamName = runContext.render(this.team).as(String.class).orElse(null);
+            if (response.statusCode() != 200) {
+                throw new IOException("Unexpected code " + response.body());
+            }
 
-        return teamsResponse
-            .getTeams()
-            .stream()
-            .filter(team -> teamName.equalsIgnoreCase(team.getName()))
-            .map(LinearData.LinearNode::getId)
-            .findFirst()
-            .orElse(null);
+            TeamsResponse teamsResponse = mapper.readValue(response.body(), TeamsResponse.class);
+
+            for (LinearData.LinearNode teamNode : teamsResponse.getTeams()) {
+                if (teamNode != null && teamNode.getName() != null && teamName.equalsIgnoreCase(teamNode.getName())) {
+                    return teamNode.getId();
+                }
+            }
+
+            LinearData.PageInfo pageInfo = teamsResponse.getPageInfo();
+            if (pageInfo == null || !Boolean.TRUE.equals(pageInfo.getHasNextPage()) || pageInfo.getEndCursor() == null || pageInfo.getEndCursor().isBlank()) {
+                break;
+            }
+            after = pageInfo.getEndCursor();
+        }
+
+        throw new IllegalArgumentException("Team '" + teamName + "' could not be found in the Linear workspace.");
+    }
+
+    String buildFetchQuery(String query, String after) throws JsonProcessingException {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("query", query);
+        if (after != null) {
+            payload.put("variables", Map.of("after", after));
+        }
+        return mapper.writeValueAsString(payload);
+    }
+
+    String buildFetchQuery(Queries query, String after) throws JsonProcessingException {
+        return buildFetchQuery(query.getValue(), after);
     }
 
     String buildInputQuery(
@@ -242,7 +311,7 @@ public class Create extends LinearConnection implements RunnableTask<Create.Outp
         input.put("title", title);
         input.put("description", description);
 
-        if (!labels.isEmpty()) {
+        if (labels != null && !labels.isEmpty()) {
             input.put("labelIds", labels);
         }
 

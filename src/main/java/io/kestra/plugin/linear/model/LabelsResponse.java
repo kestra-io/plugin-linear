@@ -1,5 +1,7 @@
 package io.kestra.plugin.linear.model;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -17,7 +19,17 @@ public class LabelsResponse {
     private List<Object> errors;
 
     public List<LinearData.LinearNode> getLabels() {
-        return List.of(data.getLabels().getNodes());
+        if (data == null || data.getLabels() == null || data.getLabels().getNodes() == null) {
+            return Collections.emptyList();
+        }
+        return Arrays.asList(data.getLabels().getNodes());
+    }
+
+    public LinearData.PageInfo getPageInfo() {
+        if (data == null || data.getLabels() == null) {
+            return null;
+        }
+        return data.getLabels().getPageInfo();
     }
 
     @Data
