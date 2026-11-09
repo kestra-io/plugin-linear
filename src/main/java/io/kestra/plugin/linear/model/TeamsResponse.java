@@ -1,5 +1,7 @@
 package io.kestra.plugin.linear.model;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -9,7 +11,7 @@ import lombok.Data;
 
 @Data
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class TeamsResponse {
+public class TeamsResponse implements GraphQLResponse {
 
     @JsonProperty("data")
     private TeamsData data;
@@ -17,7 +19,17 @@ public class TeamsResponse {
     private List<Object> errors;
 
     public List<LinearData.LinearNode> getTeams() {
-        return List.of(data.getTeams().getNodes());
+        if (data == null || data.getTeams() == null || data.getTeams().getNodes() == null) {
+            return Collections.emptyList();
+        }
+        return Arrays.asList(data.getTeams().getNodes());
+    }
+
+    public LinearData.PageInfo getPageInfo() {
+        if (data == null || data.getTeams() == null) {
+            return null;
+        }
+        return data.getTeams().getPageInfo();
     }
 
     @Data

@@ -8,15 +8,36 @@ import lombok.RequiredArgsConstructor;
 public enum Queries {
     TEAMS(
         """
-            {
-              "query": "query { teams { nodes { id name } } }"
+            query ($after: String) {
+              teams(after: $after) {
+                pageInfo {
+                  hasNextPage
+                  endCursor
+                }
+                nodes {
+                  id
+                  name
+                }
+              }
             }
             """
     ),
     LABELS(
         """
-            {
-              "query": "query { issueLabels { nodes { id name } } }"
+            query ($after: String, $teamId: ID!) {
+              issueLabels(
+                after: $after
+                filter: { or: [{ team: { id: { eq: $teamId } } }, { team: { null: true } }] }
+              ) {
+                pageInfo {
+                  hasNextPage
+                  endCursor
+                }
+                nodes {
+                  id
+                  name
+                }
+              }
             }
             """
     );
