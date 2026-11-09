@@ -2,7 +2,12 @@ package io.kestra.plugin.linear.issues;
 
 import java.io.IOException;
 import java.net.http.HttpResponse;
-import java.util.*;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 
@@ -18,6 +23,7 @@ import io.kestra.plugin.linear.LinearConnection;
 import io.kestra.plugin.linear.model.*;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 
@@ -113,6 +119,7 @@ public class Create extends LinearConnection implements RunnableTask<Create.Outp
         description = "Linear team name used to look up the team id; comparison is case-insensitive."
     )
     @PluginProperty(group = "destination")
+    @NotNull
     private Property<String> team;
 
     @Schema(
@@ -156,7 +163,7 @@ public class Create extends LinearConnection implements RunnableTask<Create.Outp
     @Override
     public Create.Output run(RunContext runContext) throws Exception {
         String teamId = getTeamId(runContext);
-        List<String> labelsIds = getLabelsIds(runContext);
+        List<String> labelsIds = getLabelsIds(runContext, teamId);
 
         String query = buildInputQuery(
             teamId,
@@ -192,7 +199,7 @@ public class Create extends LinearConnection implements RunnableTask<Create.Outp
             .build();
     }
 
-    List<String> getLabelsIds(RunContext runContext) throws Exception {
+    List<String> getLabelsIds(RunContext runContext, String teamId) throws Exception {
         if (this.labels == null) {
             return Collections.emptyList();
         }
@@ -206,21 +213,14 @@ public class Create extends LinearConnection implements RunnableTask<Create.Outp
             return Collections.emptyList();
         }
 
-        Set<String> requestedNames = new HashSet<>(names);
-        Map<String, String> foundLabels = new HashMap<>();
+        var requestedNames = new HashSet<>(names);
+        var foundLabels = new HashMap<String, String>();
 
         String after = null;
         while (true) {
-            String query = buildFetchQuery(Queries.LABELS.getValue(), after);
-            HttpResponse<String> response = makeCall(runContext, query);
+            var labelsResponse = fetchPage(runContext, Queries.LABELS, Map.of("teamId", teamId), after, LabelsResponse.class);
 
-            if (response.statusCode() != 200) {
-                throw new IOException("Unexpected code " + response.body());
-            }
-
-            LabelsResponse labelsResponse = mapper.readValue(response.body(), LabelsResponse.class);
-
-            for (LinearData.LinearNode labelNode : labelsResponse.getLabels()) {
+            for (var labelNode : labelsResponse.getLabels()) {
                 if (labelNode != null && labelNode.getName() != null && requestedNames.contains(labelNode.getName())) {
                     foundLabels.putIfAbsent(labelNode.getName(), labelNode.getId());
                 }
@@ -230,20 +230,20 @@ public class Create extends LinearConnection implements RunnableTask<Create.Outp
                 break;
             }
 
-            LinearData.PageInfo pageInfo = labelsResponse.getPageInfo();
-            if (pageInfo == null || !Boolean.TRUE.equals(pageInfo.getHasNextPage()) || pageInfo.getEndCursor() == null || pageInfo.getEndCursor().isBlank()) {
+            var pageInfo = labelsResponse.getPageInfo();
+            if (!hasNextPage(pageInfo)) {
                 break;
             }
             after = pageInfo.getEndCursor();
         }
 
-        List<String> missingLabels = names.stream()
+        var missingLabels = names.stream()
             .filter(name -> !foundLabels.containsKey(name))
             .distinct()
             .toList();
 
         if (!missingLabels.isEmpty()) {
-            runContext.logger().warn("The following labels were requested but do not exist in the Linear workspace: {}", missingLabels);
+            runContext.logger().warn("The following labels were not found in the issue's team or at workspace level and are skipped: {}", missingLabels);
         }
 
         return names.stream()
@@ -254,31 +254,24 @@ public class Create extends LinearConnection implements RunnableTask<Create.Outp
     }
 
     String getTeamId(RunContext runContext) throws Exception {
-        String teamName = this.team == null ? null : runContext.render(this.team).as(String.class).orElse(null);
+        var teamName = this.team == null ? null : runContext.render(this.team).as(String.class).orElse(null);
 
         if (teamName == null || teamName.isBlank()) {
-            throw new IllegalArgumentException("Team '" + teamName + "' could not be found in the Linear workspace.");
+            throw new IllegalArgumentException("The 'team' property is required: set it to the Linear team name");
         }
 
         String after = null;
         while (true) {
-            String query = buildFetchQuery(Queries.TEAMS.getValue(), after);
-            HttpResponse<String> response = makeCall(runContext, query);
+            var teamsResponse = fetchPage(runContext, Queries.TEAMS, Map.of(), after, TeamsResponse.class);
 
-            if (response.statusCode() != 200) {
-                throw new IOException("Unexpected code " + response.body());
-            }
-
-            TeamsResponse teamsResponse = mapper.readValue(response.body(), TeamsResponse.class);
-
-            for (LinearData.LinearNode teamNode : teamsResponse.getTeams()) {
+            for (var teamNode : teamsResponse.getTeams()) {
                 if (teamNode != null && teamNode.getName() != null && teamName.equalsIgnoreCase(teamNode.getName())) {
                     return teamNode.getId();
                 }
             }
 
-            LinearData.PageInfo pageInfo = teamsResponse.getPageInfo();
-            if (pageInfo == null || !Boolean.TRUE.equals(pageInfo.getHasNextPage()) || pageInfo.getEndCursor() == null || pageInfo.getEndCursor().isBlank()) {
+            var pageInfo = teamsResponse.getPageInfo();
+            if (!hasNextPage(pageInfo)) {
                 break;
             }
             after = pageInfo.getEndCursor();
@@ -287,17 +280,43 @@ public class Create extends LinearConnection implements RunnableTask<Create.Outp
         throw new IllegalArgumentException("Team '" + teamName + "' could not be found in the Linear workspace.");
     }
 
-    String buildFetchQuery(String query, String after) throws JsonProcessingException {
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("query", query);
+    private <T extends GraphQLResponse> T fetchPage(RunContext runContext, Queries query, Map<String, Object> variables, String after, Class<T> type) throws Exception {
+        var pageVariables = new HashMap<String, Object>(variables);
         if (after != null) {
-            payload.put("variables", Map.of("after", after));
+            pageVariables.put("after", after);
         }
-        return mapper.writeValueAsString(payload);
+        var response = makeCall(runContext, buildFetchQuery(query, pageVariables));
+        var body = response.body();
+
+        if (response.statusCode() != 200) {
+            throw new IOException("Linear API returned HTTP " + response.statusCode() + ": " + body);
+        }
+        if (body == null || body.isBlank()) {
+            throw new IOException("Linear API returned HTTP " + response.statusCode() + " with an empty body");
+        }
+
+        var page = mapper.readValue(body, type);
+        var errors = page.errorMessages();
+        if (!errors.isEmpty()) {
+            throw new IOException("Linear API returned " + response.statusCode() + ": " + errors + ". Check the token permissions");
+        }
+        return page;
     }
 
-    String buildFetchQuery(Queries query, String after) throws JsonProcessingException {
-        return buildFetchQuery(query.getValue(), after);
+    private static boolean hasNextPage(LinearData.PageInfo pageInfo) {
+        return pageInfo != null
+            && Boolean.TRUE.equals(pageInfo.getHasNextPage())
+            && pageInfo.getEndCursor() != null
+            && !pageInfo.getEndCursor().isBlank();
+    }
+
+    String buildFetchQuery(Queries query, Map<String, Object> variables) throws JsonProcessingException {
+        var payload = new HashMap<String, Object>();
+        payload.put("query", query.getValue());
+        if (variables != null && !variables.isEmpty()) {
+            payload.put("variables", variables);
+        }
+        return mapper.writeValueAsString(payload);
     }
 
     String buildInputQuery(

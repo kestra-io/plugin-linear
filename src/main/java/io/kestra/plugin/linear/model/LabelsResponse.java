@@ -11,7 +11,7 @@ import lombok.Data;
 
 @Data
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class LabelsResponse {
+public class LabelsResponse implements GraphQLResponse {
 
     @JsonProperty("data")
     private LabelsData data;

@@ -1,8 +1,10 @@
 package io.kestra.plugin.linear.issues;
 
+import java.io.IOException;
 import java.net.http.HttpResponse;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
@@ -58,12 +60,12 @@ class CreatePaginationTest {
     void shouldBuildFetchQueryCorrectly() throws Exception {
         Create create = Create.builder().build();
 
-        String withoutAfter = create.buildFetchQuery(Queries.TEAMS.getValue(), null);
+        String withoutAfter = create.buildFetchQuery(Queries.TEAMS, Map.of());
         JsonNode nodeWithout = MAPPER.readTree(withoutAfter);
         assertThat(nodeWithout.has("query"), is(true));
         assertThat(nodeWithout.has("variables"), is(false));
 
-        String withAfter = create.buildFetchQuery(Queries.TEAMS.getValue(), "cursor-123");
+        String withAfter = create.buildFetchQuery(Queries.TEAMS, Map.of("after", "cursor-123"));
         JsonNode nodeWith = MAPPER.readTree(withAfter);
         assertThat(nodeWith.has("query"), is(true));
         assertThat(nodeWith.at("/variables/after").asText(), is("cursor-123"));
@@ -191,14 +193,14 @@ class CreatePaginationTest {
             IllegalArgumentException.class,
             () -> nullTeamCreate.getTeamId(runContext)
         );
-        assertThat(exNull.getMessage(), is("Team 'null' could not be found in the Linear workspace."));
+        assertThat(exNull.getMessage(), is("The 'team' property is required: set it to the Linear team name"));
 
         Create blankTeamCreate = Create.builder().team(Property.ofValue("   ")).build();
         IllegalArgumentException exBlank = assertThrows(
             IllegalArgumentException.class,
             () -> blankTeamCreate.getTeamId(runContext)
         );
-        assertThat(exBlank.getMessage(), is("Team '   ' could not be found in the Linear workspace."));
+        assertThat(exBlank.getMessage(), is("The 'team' property is required: set it to the Linear team name"));
     }
 
     @Test
@@ -271,7 +273,7 @@ class CreatePaginationTest {
             })
             .build();
 
-        List<String> labelsIds = create.getLabelsIds(runContext);
+        List<String> labelsIds = create.getLabelsIds(runContext, "t1");
 
         // Both "Bug" (l1) and "Feature" (l3) found by page 2; page 3 should NOT be queried
         assertThat(labelsIds, contains("l1", "l3"));
@@ -303,7 +305,7 @@ class CreatePaginationTest {
             .callHandler(query -> mockResponse(200, page1))
             .build();
 
-        List<String> labelsIds = create.getLabelsIds(runContext);
+        List<String> labelsIds = create.getLabelsIds(runContext, "t1");
 
         assertThat(labelsIds, contains("l1"));
     }
@@ -321,7 +323,7 @@ class CreatePaginationTest {
             })
             .build();
 
-        assertThat(create.getLabelsIds(runContext), is(empty()));
+        assertThat(create.getLabelsIds(runContext, "t1"), is(empty()));
 
         TestCreate emptyListLabelsCreate = TestCreate.builder()
             .labels(Property.ofValue(List.of()))
@@ -332,7 +334,7 @@ class CreatePaginationTest {
             })
             .build();
 
-        assertThat(emptyListLabelsCreate.getLabelsIds(runContext), is(empty()));
+        assertThat(emptyListLabelsCreate.getLabelsIds(runContext, "t1"), is(empty()));
 
         assertThat(callCount.get(), is(0));
     }
@@ -404,7 +406,7 @@ class CreatePaginationTest {
             {
                 if (query.contains("teams(after")) {
                     return mockResponse(200, teamResponse);
-                } else if (query.contains("issueLabels(after")) {
+                } else if (query.contains("issueLabels(")) {
                     return mockResponse(200, labelsResponse);
                 } else if (query.contains("issueCreate")) {
                     return mockResponse(200, mutationResponse);
@@ -419,5 +421,95 @@ class CreatePaginationTest {
         assertThat(output.getIssueId(), is("issue-789"));
         assertThat(output.getIssueIdentifier(), is("COR-101"));
         assertThat(output.getIssueUrl(), is("https://linear.app/issue/COR-101"));
+    }
+
+    @Test
+    void shouldScopeLabelLookupToTeamAndWorkspace() throws Exception {
+        RunContext runContext = runContextFactory.of();
+        List<String> queriesExecuted = new ArrayList<>();
+
+        String page = """
+            {
+              "data": {
+                "issueLabels": {
+                  "pageInfo": { "hasNextPage": false, "endCursor": null },
+                  "nodes": [ { "id": "l1", "name": "Bug" } ]
+                }
+              }
+            }
+            """;
+
+        TestCreate create = TestCreate.builder()
+            .labels(Property.ofValue(List.of("Bug")))
+            .callHandler(query ->
+            {
+                queriesExecuted.add(query);
+                return mockResponse(200, page);
+            })
+            .build();
+
+        assertThat(create.getLabelsIds(runContext, "team-42"), contains("l1"));
+        assertThat(queriesExecuted.size(), is(1));
+
+        JsonNode payload = MAPPER.readTree(queriesExecuted.getFirst());
+        assertThat(payload.at("/variables/teamId").asText(), is("team-42"));
+        assertThat(payload.at("/variables").has("after"), is(false));
+        assertThat(payload.at("/query").asText(), containsString("team: { id: { eq: $teamId } }"));
+    }
+
+    @Test
+    void shouldFailWithLinearErrorsWhenResponseCarriesGraphQLErrors() {
+        RunContext runContext = runContextFactory.of();
+
+        TestCreate create = TestCreate.builder()
+            .team(Property.ofValue("Eng"))
+            .callHandler(query -> mockResponse(200, "{ \"errors\": [ { \"message\": \"Authentication required, not authenticated\" } ] }"))
+            .build();
+
+        IOException ex = assertThrows(IOException.class, () -> create.getTeamId(runContext));
+
+        assertThat(ex.getMessage(), is("Linear API returned 200: [Authentication required, not authenticated]. Check the token permissions"));
+    }
+
+    @Test
+    void shouldFailWithLinearErrorsWhenLabelsResponseCarriesGraphQLErrors() {
+        RunContext runContext = runContextFactory.of();
+
+        TestCreate create = TestCreate.builder()
+            .labels(Property.ofValue(List.of("Bug")))
+            .callHandler(query -> mockResponse(200, "{ \"errors\": [ { \"message\": \"Forbidden\" } ] }"))
+            .build();
+
+        IOException ex = assertThrows(IOException.class, () -> create.getLabelsIds(runContext, "t1"));
+
+        assertThat(ex.getMessage(), is("Linear API returned 200: [Forbidden]. Check the token permissions"));
+    }
+
+    @Test
+    void shouldIncludeStatusCodeOnNonOkResponse() {
+        RunContext runContext = runContextFactory.of();
+
+        TestCreate create = TestCreate.builder()
+            .team(Property.ofValue("Eng"))
+            .callHandler(query -> mockResponse(401, "Unauthorized"))
+            .build();
+
+        IOException ex = assertThrows(IOException.class, () -> create.getTeamId(runContext));
+
+        assertThat(ex.getMessage(), is("Linear API returned HTTP 401: Unauthorized"));
+    }
+
+    @Test
+    void shouldFailOnEmptyBody() {
+        RunContext runContext = runContextFactory.of();
+
+        TestCreate create = TestCreate.builder()
+            .team(Property.ofValue("Eng"))
+            .callHandler(query -> mockResponse(200, ""))
+            .build();
+
+        IOException ex = assertThrows(IOException.class, () -> create.getTeamId(runContext));
+
+        assertThat(ex.getMessage(), is("Linear API returned HTTP 200 with an empty body"));
     }
 }

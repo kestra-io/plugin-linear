@@ -24,8 +24,11 @@ public enum Queries {
     ),
     LABELS(
         """
-            query ($after: String) {
-              issueLabels(after: $after) {
+            query ($after: String, $teamId: ID!) {
+              issueLabels(
+                after: $after
+                filter: { or: [{ team: { id: { eq: $teamId } } }, { team: { null: true } }] }
+              ) {
                 pageInfo {
                   hasNextPage
                   endCursor

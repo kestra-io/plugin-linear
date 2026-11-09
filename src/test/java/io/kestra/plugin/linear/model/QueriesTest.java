@@ -22,11 +22,13 @@ class QueriesTest {
     void labelsQueryContainsPaginationAndPageInfo() {
         String query = Queries.LABELS.getValue();
         assertThat(query, containsString("$after: String"));
-        assertThat(query, containsString("issueLabels(after: $after)"));
+        assertThat(query, containsString("$teamId: ID!"));
+        assertThat(query, containsString("after: $after"));
+        assertThat(query, containsString("team: { id: { eq: $teamId } }"));
+        assertThat(query, containsString("team: { null: true }"));
         assertThat(query, containsString("pageInfo"));
         assertThat(query, containsString("hasNextPage"));
         assertThat(query, containsString("endCursor"));
         assertThat(query, containsString("nodes"));
     }
 }
-

@@ -11,7 +11,7 @@ import lombok.Data;
 
 @Data
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class TeamsResponse {
+public class TeamsResponse implements GraphQLResponse {
 
     @JsonProperty("data")
     private TeamsData data;
